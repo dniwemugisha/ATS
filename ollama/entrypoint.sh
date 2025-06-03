@@ -1,6 +1,15 @@
 #!/bin/bash
 
-echo "🚀 Starting Ollama with automatic phi3 setup..."
+# Configuration from environment variables
+OLLAMA_MODEL=${OLLAMA_MODEL:-phi3}
+OLLAMA_AUTO_PULL=${OLLAMA_AUTO_PULL:-true}
+OLLAMA_STARTUP_TIMEOUT=${OLLAMA_STARTUP_TIMEOUT:-30}
+
+echo "🚀 Starting Ollama with automatic $OLLAMA_MODEL setup..."
+echo "📋 Configuration:"
+echo "   Model: $OLLAMA_MODEL"
+echo "   Auto-pull: $OLLAMA_AUTO_PULL"
+echo "   Timeout: ${OLLAMA_STARTUP_TIMEOUT}s"
 
 # Start Ollama in the background
 ollama serve &
@@ -19,7 +28,7 @@ trap cleanup SIGTERM SIGINT
 
 # Wait for Ollama to be ready
 echo "⏳ Waiting for Ollama to be ready..."
-max_attempts=30
+max_attempts=$OLLAMA_STARTUP_TIMEOUT
 attempt=0
 
 while [ $attempt -lt $max_attempts ]; do
@@ -44,20 +53,48 @@ if [ $attempt -eq $max_attempts ]; then
     fi
 fi
 
-# Check if phi3 model exists
-echo "🔍 Checking for phi3 model..."
-if ollama list | grep -q "phi3"; then
-    echo "✅ phi3 model already exists"
-else
-    echo "📥 Downloading phi3 model (2.3GB)..."
-    echo "   This will take a few minutes on first startup..."
-    
-    if ollama pull phi3; then
-        echo "✅ phi3 model downloaded successfully!"
+# Handle model download/verification
+if [ "$OLLAMA_AUTO_PULL" = "true" ]; then
+    echo "🔍 Checking for $OLLAMA_MODEL model..."
+    if ollama list | grep -q "$OLLAMA_MODEL"; then
+        echo "✅ $OLLAMA_MODEL model already exists"
     else
-        echo "❌ Failed to download phi3 model"
-        echo "💡 You can manually download it later with: docker exec ats-ollama ollama pull phi3"
+        echo "📥 Downloading $OLLAMA_MODEL model..."
+        echo "   This may take several minutes depending on model size..."
+        
+        # Get model info for better user experience
+        case $OLLAMA_MODEL in
+            "phi3")
+                echo "   📦 phi3: 2.3GB - Fast, efficient, good for development"
+                ;;
+            "llama3")
+                echo "   📦 llama3: 4.7GB - High quality, best for production"
+                ;;
+            "codellama")
+                echo "   📦 codellama: 3.8GB - Optimized for code analysis"
+                ;;
+            "mistral")
+                echo "   📦 mistral: 4.1GB - Balanced performance and quality"
+                ;;
+            "llama3.1")
+                echo "   📦 llama3.1: 4.7GB - Latest version with improvements"
+                ;;
+            *)
+                echo "   📦 $OLLAMA_MODEL: Unknown size - Custom model"
+                ;;
+        esac
+        
+        if ollama pull $OLLAMA_MODEL; then
+            echo "✅ $OLLAMA_MODEL model downloaded successfully!"
+        else
+            echo "❌ Failed to download $OLLAMA_MODEL model"
+            echo "💡 You can manually download it later with: docker exec ats-ollama ollama pull $OLLAMA_MODEL"
+            echo "💡 Or disable auto-pull with OLLAMA_AUTO_PULL=false"
+        fi
     fi
+else
+    echo "⏭️  Auto-pull disabled, skipping model download"
+    echo "💡 Make sure to manually pull required models"
 fi
 
 echo "🎉 Ollama setup complete!"

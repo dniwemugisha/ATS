@@ -33,6 +33,10 @@ services:
       - ollama_data:/root/.ollama
     environment:
       - OLLAMA_HOST=0.0.0.0
+      # Model configuration (can be overridden in .env file)
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-phi3}
+      - OLLAMA_AUTO_PULL=${OLLAMA_AUTO_PULL:-true}
+      - OLLAMA_STARTUP_TIMEOUT=${OLLAMA_STARTUP_TIMEOUT:-30}
     networks:
       - ats-network
     restart: unless-stopped

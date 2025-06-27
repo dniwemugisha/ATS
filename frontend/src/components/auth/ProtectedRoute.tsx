@@ -3,6 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Role } from '../../types/user';
 import axiosInstance from '../../utils/axios';
+import { storeCurrentRouteIfNeeded, getTargetRouteForUser } from '../../utils/routeUtils';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -89,11 +90,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
   // If not authenticated after validation, redirect to login
   if (!isAuthenticated) {
     console.log('ProtectedRoute - Not authenticated after validation, redirecting to login');
-    // Store the current path if it's an admin path to restore after login
-    if (location.pathname.startsWith('/admin/')) {
-      sessionStorage.setItem('lastAdminRoute', location.pathname);
-      console.log('ProtectedRoute - Stored admin route before login redirect:', location.pathname);
-    }
+    // Store the current path for any role-based route to restore after login
+    storeCurrentRouteIfNeeded(location.pathname);
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
   
@@ -122,23 +120,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
     console.log('ProtectedRoute - User role not allowed:', user.role);
     console.log('ProtectedRoute - Allowed roles:', allowedRoles);
-    switch (user.role) {
-      case Role.ADMIN:
-        console.log('ProtectedRoute - Redirecting to admin dashboard');
-        return <Navigate to="/admin" replace />;
-      case Role.INTERVIEWER:
-        console.log('ProtectedRoute - Redirecting to interviewer dashboard');
-        return <Navigate to="/interviewer" replace />;
-      case Role.HIRING_MANAGER:
-        console.log('ProtectedRoute - Redirecting to hiring manager dashboard');
-        return <Navigate to="/hiring-manager" replace />;
-      case Role.CANDIDATE:
-        console.log('ProtectedRoute - Redirecting to candidate dashboard');
-        return <Navigate to="/candidate" replace />;
-      default:
-        console.log('ProtectedRoute - Unknown role, redirecting to login');
-        return <Navigate to="/login" replace />;
-    }
+    
+    // Get target route (either stored route or default dashboard)
+    const targetRoute = getTargetRouteForUser(user.role);
+    console.log('ProtectedRoute - Redirecting to:', targetRoute);
+    
+    return <Navigate to={targetRoute} replace />;
   }
 
   console.log('ProtectedRoute - Access granted');

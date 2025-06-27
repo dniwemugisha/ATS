@@ -84,7 +84,21 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   // Otherwise, apply normal redirection logic for authenticated users
   if (user && token) {
-    // Always redirect authenticated users to dashboard, which will handle role-based redirection
+    // Check if user is already on a valid path for their role
+    const userRole = user.role;
+    
+    // If user is already on the correct role-based path, don't redirect
+    if (
+      (userRole === 'ADMIN' && currentPath.startsWith('/admin')) ||
+      (userRole === 'INTERVIEWER' && currentPath.startsWith('/interviewer')) ||
+      (userRole === 'HIRING_MANAGER' && currentPath.startsWith('/hiring-manager')) ||
+      (userRole === 'CANDIDATE' && currentPath.startsWith('/candidate'))
+    ) {
+      // User is already on the correct path, no need to redirect
+      return <>{children}</>;
+    }
+    
+    // Otherwise redirect to dashboard which will handle role-based redirection
     return <Navigate to="/dashboard" replace />;
   }
 

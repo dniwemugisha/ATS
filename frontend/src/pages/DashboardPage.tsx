@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../utils/axios';
 import { Role } from '../types/user';
+import { getTargetRouteForUser } from '../utils/routeUtils';
 
 const DashboardPage: React.FC = () => {
   console.log('DashboardPage - Rendering');
@@ -11,7 +12,7 @@ const DashboardPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Function to redirect based on role
+  // Function to redirect based on role, preserving stored routes when possible
   const redirectBasedOnRole = (userRole: string) => {
     console.log('DashboardPage - Redirecting based on role:', userRole);
     
@@ -23,47 +24,81 @@ const DashboardPage: React.FC = () => {
       return;
     }
     
-    // Normalize role by removing ROLE_ prefix if present
+    // Get the current path to check if user is already on a valid path for their role
+    const currentPath = window.location.pathname;
+    console.log('DashboardPage - Current path:', currentPath);
+    
+    // Check if user is already on a valid path for their role
     const normalizedRole = userRole.replace('ROLE_', '').toUpperCase();
-    console.log('DashboardPage - Normalized role:', normalizedRole);
+    let isOnValidPath = false;
     
-    // Map the normalized role to an actual Role enum value if possible
-    let roleEnum: Role | null = null;
-    
-    // Check each possible role value
-    if (normalizedRole === 'ADMIN' || normalizedRole === Role.ADMIN) {
-      roleEnum = Role.ADMIN;
-    } else if (normalizedRole === 'INTERVIEWER' || normalizedRole === Role.INTERVIEWER) {
-      roleEnum = Role.INTERVIEWER;
-    } else if (normalizedRole === 'HIRING_MANAGER' || normalizedRole === Role.HIRING_MANAGER) {
-      roleEnum = Role.HIRING_MANAGER;
-    } else if (normalizedRole === 'CANDIDATE' || normalizedRole === Role.CANDIDATE) {
-      roleEnum = Role.CANDIDATE;
+    switch (normalizedRole) {
+      case 'ADMIN':
+        isOnValidPath = currentPath.startsWith('/admin');
+        break;
+      case 'INTERVIEWER':
+        isOnValidPath = currentPath.startsWith('/interviewer');
+        break;
+      case 'HIRING_MANAGER':
+        isOnValidPath = currentPath.startsWith('/hiring-manager');
+        break;
+      case 'CANDIDATE':
+        isOnValidPath = currentPath.startsWith('/candidate');
+        break;
     }
     
-    console.log('DashboardPage - Mapped to enum:', roleEnum);
+    if (isOnValidPath) {
+      console.log('DashboardPage - User already on valid path, no redirect needed');
+      setIsLoading(false);
+      return;
+    }
     
-    // Redirect based on mapped role
-    if (roleEnum === Role.ADMIN) {
-      console.log('DashboardPage - Redirecting to admin dashboard');
-      navigate('/admin');
-    } else if (roleEnum === Role.INTERVIEWER) {
-      console.log('DashboardPage - Redirecting to interviewer dashboard');
-      navigate('/interviewer');
-    } else if (roleEnum === Role.HIRING_MANAGER) {
-      console.log('DashboardPage - Redirecting to hiring manager dashboard');
-      navigate('/hiring-manager');
-    } else if (roleEnum === Role.CANDIDATE) {
-      console.log('DashboardPage - Redirecting to candidate dashboard');
-      navigate('/candidate');
-    } else {
-      console.log('DashboardPage - Unknown role, staying on generic dashboard');
+    // Get target route (either stored route or default dashboard)
+    const targetPath = getTargetRouteForUser(userRole);
+    console.log('DashboardPage - Redirecting to:', targetPath);
+    
+    if (targetPath === '/dashboard') {
       setError(`Unknown role: ${userRole}. Please contact support.`);
       setIsLoading(false);
+      return;
     }
+    
+    navigate(targetPath, { replace: true });
   };
 
   useEffect(() => {
+    console.log('DashboardPage - useEffect triggered');
+    
+    // Check if there's a stored route to restore
+    const storedRoute = sessionStorage.getItem('lastVisitedRoute');
+    console.log('DashboardPage - Stored route found:', storedRoute);
+    
+    if (user && storedRoute) {
+      // Check if the stored route matches the user's role
+      const userRole = user.role;
+      let shouldRestoreRoute = false;
+      
+      if (userRole === Role.ADMIN && storedRoute.startsWith('/admin/')) {
+        shouldRestoreRoute = true;
+      } else if (userRole === Role.INTERVIEWER && storedRoute.startsWith('/interviewer/')) {
+        shouldRestoreRoute = true;
+      } else if (userRole === Role.HIRING_MANAGER && storedRoute.startsWith('/hiring-manager/')) {
+        shouldRestoreRoute = true;
+      } else if (userRole === Role.CANDIDATE && storedRoute.startsWith('/candidate/')) {
+        shouldRestoreRoute = true;
+      }
+      
+      if (shouldRestoreRoute) {
+        console.log('DashboardPage - Restoring stored route:', storedRoute);
+        sessionStorage.removeItem('lastVisitedRoute');
+        navigate(storedRoute, { replace: true });
+        return;
+      } else {
+        // Clear invalid stored route
+        sessionStorage.removeItem('lastVisitedRoute');
+      }
+    }
+    
     const checkUserAndRedirect = async () => {
       try {
         if (user) {
